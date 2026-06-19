@@ -1,0 +1,1485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trip Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root{
+    --bg:#EDEAE2;
+    --surface:#FFFFFF;
+    --surface-soft:#F6F4EE;
+    --ink:#1B2430;
+    --ink-soft:#5B6270;
+    --ink-faint:#8A8F99;
+    --accent:#E2792E;
+    --accent-dark:#B85F1F;
+    --accent-soft:#FBE6D2;
+    --positive:#2F6B3A;
+    --positive-soft:#E3EFE2;
+    --negative:#B6452C;
+    --negative-soft:#F6E4DD;
+    --line:#D8D3C7;
+    --line-strong:#C2BCAC;
+    --radius:10px;
+    --font-display:'Oswald',sans-serif;
+    --font-body:'IBM Plex Sans',sans-serif;
+    --font-mono:'IBM Plex Mono',monospace;
+    --shadow:0 1px 2px rgba(27,36,48,0.06),0 4px 14px rgba(27,36,48,0.06);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    background-image:
+      linear-gradient(var(--bg),var(--bg)),
+      repeating-linear-gradient(0deg, rgba(27,36,48,0.025) 0px, rgba(27,36,48,0.025) 1px, transparent 1px, transparent 36px);
+    color:var(--ink);
+    font-family:var(--font-body);
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:0.001ms !important; transition-duration:0.001ms !important;}
+  }
+  a{color:inherit;}
+  button{font-family:inherit;cursor:pointer;}
+  input,select,button{font-size:14px;}
+  :focus-visible{outline:2px solid var(--accent-dark); outline-offset:2px;}
+
+  #app{max-width:1320px;margin:0 auto;padding:28px 20px 80px;}
+
+  /* ---------- Header ---------- */
+  .header{
+    display:flex; align-items:flex-start; justify-content:space-between; gap:20px;
+    flex-wrap:wrap; margin-bottom:18px;
+  }
+  .brand{display:flex; align-items:center; gap:14px;}
+  .brand-mark{
+    width:46px; height:46px; border-radius:8px; background:var(--ink);
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    position:relative; overflow:hidden;
+  }
+  .brand-mark::before{
+    content:""; position:absolute; left:-6px; right:-6px; top:50%;
+    height:3px; background:repeating-linear-gradient(90deg, var(--accent) 0 8px, transparent 8px 14px);
+    transform:translateY(-50%) rotate(-18deg);
+  }
+  .brand h1{font-family:var(--font-display); font-weight:600; font-size:23px; margin:0; letter-spacing:0.2px;}
+  .brand p{margin:2px 0 0; font-size:12.5px; color:var(--ink-soft);}
+
+  .sync-cluster{display:flex; flex-direction:column; align-items:flex-end; gap:8px;}
+  .sync-status{
+    display:flex; align-items:center; gap:7px; font-size:12.5px; color:var(--ink-soft);
+    font-family:var(--font-mono);
+  }
+  .sync-dot{width:7px; height:7px; border-radius:50%; background:var(--ink-faint); flex-shrink:0;}
+  .sync-dot.ok{background:var(--positive);}
+  .sync-dot.busy{background:var(--accent); animation:pulse 1.1s ease-in-out infinite;}
+  .sync-dot.err{background:var(--negative);}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.35;}}
+  .sync-buttons{display:flex; gap:8px;}
+
+  .btn{
+    border:1px solid var(--line-strong); background:var(--surface); color:var(--ink);
+    padding:8px 14px; border-radius:7px; font-weight:500; font-size:13px;
+    transition:border-color .15s, background .15s, transform .05s;
+  }
+  .btn:hover{border-color:var(--ink-faint);}
+  .btn:active{transform:translateY(1px);}
+  .btn-primary{background:var(--accent); border-color:var(--accent-dark); color:#fff;}
+  .btn-primary:hover{background:var(--accent-dark);}
+  .btn-ghost{background:transparent; border-color:transparent; color:var(--ink-soft); padding:8px 10px;}
+  .btn-ghost:hover{color:var(--ink); background:var(--surface-soft);}
+  .btn-sm{padding:5px 10px; font-size:12px;}
+  .btn[disabled]{opacity:0.5; cursor:not-allowed;}
+
+  /* road-dash divider */
+  .lane{
+    border:none; margin:18px 0 22px;
+    background-image:repeating-linear-gradient(90deg, var(--accent) 0 16px, transparent 16px 30px);
+    height:3px; border-radius:2px; opacity:0.65;
+  }
+
+  /* ---------- Tabs ---------- */
+  .tabs{display:flex; gap:4px; margin-bottom:18px; border-bottom:1px solid var(--line);}
+  .tab{
+    padding:10px 16px; font-family:var(--font-display); font-weight:500; font-size:14px;
+    letter-spacing:0.3px; color:var(--ink-soft); background:transparent; border:none;
+    border-bottom:2px solid transparent; margin-bottom:-1px;
+  }
+  .tab.active{color:var(--ink); border-bottom-color:var(--accent);}
+  .tab:hover:not(.active){color:var(--ink);}
+  .view{display:none;}
+  .view.active{display:block;}
+
+  /* ---------- Cards / panels ---------- */
+  .panel{
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+    box-shadow:var(--shadow); padding:18px 20px; margin-bottom:18px;
+  }
+  .panel-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; gap:10px; flex-wrap:wrap;}
+  .panel-head h2{font-family:var(--font-display); font-size:16px; font-weight:600; margin:0; letter-spacing:0.2px;}
+  .panel-head .hint{font-size:12px; color:var(--ink-faint);}
+
+  /* ---------- Form ---------- */
+  .form-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:12px;}
+  @media (max-width:760px){.form-grid{grid-template-columns:repeat(2,1fr);}}
+  .field{display:flex; flex-direction:column; gap:4px;}
+  .field label{font-size:11.5px; text-transform:uppercase; letter-spacing:0.4px; color:var(--ink-faint); font-weight:600;}
+  .field .sublabel{font-size:10px; color:var(--ink-faint); text-transform:none; letter-spacing:0; font-weight:400; margin-top:-2px;}
+  .field input, .field select{
+    border:1px solid var(--line-strong); border-radius:6px; padding:8px 10px;
+    background:var(--surface-soft); color:var(--ink); font-family:var(--font-body);
+  }
+  .field input:focus, .field select:focus{background:#fff;}
+  .field input:disabled{
+    background:repeating-linear-gradient(135deg, var(--surface-soft) 0 6px, #EFEAE0 6px 12px);
+    color:var(--ink-soft); cursor:not-allowed; border-style:dashed; font-family:var(--font-mono); font-weight:600;
+  }
+  .field input:disabled.pending-due{color:var(--accent-dark);}
+  .field input:disabled.pending-clear{color:var(--positive);}
+  .field.span2{grid-column:span 2;}
+  .driver-field-block{margin-top:14px;}
+  .form-actions{display:flex; gap:10px; margin-top:14px; align-items:center; flex-wrap:wrap;}
+  .form-note{font-size:12px; color:var(--ink-faint); margin-left:auto;}
+  .live-calc{font-family:var(--font-mono); font-size:12.5px; color:var(--ink-soft);}
+  .live-calc b{color:var(--ink);}
+
+  /* ---------- Chips ---------- */
+  .chip-row{display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;}
+  .chip{
+    border:1px solid var(--line-strong); background:var(--surface-soft); color:var(--ink-soft);
+    border-radius:999px; padding:4px 12px; font-size:12px; font-family:var(--font-body);
+    transition:all .12s;
+  }
+  .chip:hover{border-color:var(--ink-faint);}
+  .chip.chip-on{background:var(--accent-soft); border-color:var(--accent); color:var(--accent-dark); font-weight:600;}
+  .roster-chip{display:inline-flex; align-items:center; gap:7px; background:var(--surface-soft); border:1px solid var(--line-strong); border-radius:999px; padding:4px 6px 4px 12px; font-size:12px;}
+  .chip-remove{border:none; background:transparent; color:var(--ink-faint); font-size:11px; padding:2px 5px; border-radius:50%; line-height:1;}
+  .chip-remove:hover{color:var(--negative); background:var(--negative-soft);}
+  .veh-drivers-label{font-size:10.5px; text-transform:uppercase; letter-spacing:0.4px; color:var(--ink-faint); font-weight:600; margin-top:10px;}
+
+  /* ---------- Table ---------- */
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  thead th{
+    text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:0.5px;
+    color:var(--ink-faint); font-weight:600; padding:8px 10px; border-bottom:1px solid var(--line);
+    white-space:nowrap;
+  }
+  tbody td{padding:10px; border-bottom:1px solid var(--surface-soft); vertical-align:middle;}
+  tbody tr:hover{background:var(--surface-soft);}
+  td.num, th.num{text-align:right; font-family:var(--font-mono);}
+  td.mono{font-family:var(--font-mono); font-size:12.5px;}
+  .route-cell{color:var(--ink-soft); font-size:12.5px;}
+  .profit-pos{color:var(--positive); font-weight:600;}
+  .profit-neg{color:var(--negative); font-weight:600;}
+  .pending-due{color:var(--accent-dark); font-weight:600;}
+  .pending-clear{color:var(--ink-faint);}
+
+  .trip-tag{
+    font-family:var(--font-mono); font-size:11px; font-weight:600; color:var(--ink-soft);
+    border:1px dashed var(--line-strong); border-radius:4px; padding:2px 6px; display:inline-block;
+  }
+
+  .stamp{
+    font-family:var(--font-display); font-size:10.5px; font-weight:600; letter-spacing:1px;
+    padding:3px 9px; border-radius:3px; display:inline-block; text-transform:uppercase;
+  }
+  .stamp-open{color:var(--accent-dark); border:1.5px dashed var(--accent); transform:rotate(-3deg); background:var(--accent-soft);}
+  .stamp-closed{color:var(--positive); border:1.5px solid var(--positive); transform:rotate(-3deg); background:var(--positive-soft);}
+
+  .row-actions{display:flex; gap:4px;}
+  .icon-btn{
+    border:none; background:transparent; color:var(--ink-faint); padding:4px 6px; border-radius:5px; font-size:13px;
+  }
+  .icon-btn:hover{color:var(--ink); background:var(--surface-soft);}
+  .icon-btn.pay{font-family:var(--font-mono); font-weight:600; font-size:11px; color:var(--accent-dark);}
+  .icon-btn.pay:hover{background:var(--accent-soft);}
+
+  .empty{
+    text-align:center; padding:46px 20px; color:var(--ink-faint);
+  }
+  .empty .big{font-family:var(--font-display); font-size:17px; color:var(--ink-soft); margin-bottom:6px;}
+
+  /* ---------- Vehicle cards ---------- */
+  .vehicle-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px;}
+  .vehicle-card{
+    border:1px solid var(--line); border-radius:8px; padding:14px; background:var(--surface-soft);
+    position:relative;
+  }
+  .vehicle-card .veh-no{font-family:var(--font-mono); font-weight:600; font-size:14.5px; letter-spacing:0.3px;}
+  .vehicle-card .veh-stats{margin-top:8px; font-size:12px; color:var(--ink-soft); line-height:1.7;}
+  .vehicle-card .remove-veh{position:absolute; top:10px; right:10px;}
+
+  .add-inline{display:flex; gap:8px; margin-top:14px; max-width:420px;}
+  .add-inline input{flex:1; border:1px solid var(--line-strong); border-radius:6px; padding:8px 10px; background:#fff;}
+
+  /* ---------- Toast ---------- */
+  #toast-wrap{position:fixed; bottom:20px; right:20px; display:flex; flex-direction:column; gap:8px; z-index:50;}
+  .toast{
+    background:var(--ink); color:#fff; padding:10px 16px; border-radius:7px; font-size:13px;
+    box-shadow:var(--shadow); max-width:320px; animation:slidein .18s ease-out;
+  }
+  .toast.err{background:var(--negative);}
+  .toast.ok{background:var(--positive);}
+  @keyframes slidein{from{transform:translateY(8px); opacity:0;} to{transform:translateY(0); opacity:1;}}
+
+  /* ---------- Modal ---------- */
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(27,36,48,0.45); display:none;
+    align-items:flex-start; justify-content:center; padding:40px 16px; z-index:60; overflow-y:auto;
+  }
+  .modal-backdrop.show{display:flex;}
+  .modal{
+    background:#fff; border-radius:var(--radius); padding:22px; width:100%; max-width:560px;
+    box-shadow:0 10px 40px rgba(0,0,0,0.25);
+  }
+  .modal h3{font-family:var(--font-display); margin:0 0 6px; font-size:18px;}
+  .modal .modal-sub{font-size:12.5px; color:var(--ink-soft); margin-bottom:16px; white-space:pre-line;}
+  .modal-actions{display:flex; justify-content:flex-end; gap:10px; margin-top:18px;}
+  .summary-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:6px;}
+  .summary-grid .stat{background:var(--surface-soft); border-radius:7px; padding:10px 12px;}
+  .summary-grid .stat .lab{font-size:11px; text-transform:uppercase; color:var(--ink-faint); letter-spacing:0.4px;}
+  .summary-grid .stat .val{font-family:var(--font-mono); font-size:16px; font-weight:600; margin-top:2px;}
+
+  .progress-line{font-family:var(--font-mono); font-size:12px; color:var(--ink-soft); margin-top:6px; white-space:pre-line;}
+
+  .payment-history-label{font-size:11px; text-transform:uppercase; color:var(--ink-faint); letter-spacing:0.4px; font-weight:600; margin:14px 0 4px;}
+  .payment-row{display:flex; justify-content:space-between; font-size:12.5px; padding:5px 0; border-bottom:1px solid var(--surface-soft); font-family:var(--font-mono);}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="header">
+    <div class="brand">
+      <div class="brand-mark"></div>
+      <div>
+        <h1>Trip Ledger</h1>
+        <p>Vehicle-wise trip &amp; expense tracking</p>
+      </div>
+    </div>
+    <div class="sync-cluster">
+      <div class="sync-status" id="sync-status">
+        <span class="sync-dot" id="sync-dot"></span>
+        <span id="sync-text">Loading…</span>
+      </div>
+      <div class="sync-buttons">
+        <button class="btn btn-sm" id="btn-settings" title="Connect your own Google Drive">⚙ Setup</button>
+        <button class="btn btn-sm" id="btn-load-drive">↓ Load from Drive</button>
+        <button class="btn btn-sm btn-primary" id="btn-save-drive">↑ Sync to Drive</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="lane"></div>
+
+  <div class="tabs">
+    <button class="tab active" data-view="trips">Trip Log</button>
+    <button class="tab" data-view="vehicles">Vehicle Master</button>
+    <button class="tab" data-view="summary">Monthly Summary</button>
+    <button class="tab" data-view="loans">Loan / EMI</button>
+  </div>
+
+  <!-- TRIP LOG -->
+  <section class="view active" id="view-trips">
+    <div class="panel">
+      <div class="panel-head">
+        <h2 id="trip-form-title">Add a trip</h2>
+        <span class="hint" id="trip-form-hint">Only From Date and Vehicle are required — fill the rest as receipts come in</span>
+      </div>
+      <form id="trip-form">
+        <input type="hidden" id="f-trip-id">
+        <div class="form-grid">
+          <div class="field"><label>From Date *</label><input type="date" id="f-date-from" required></div>
+          <div class="field"><label>To Date</label><input type="date" id="f-date-to"></div>
+          <div class="field"><label>Vehicle *</label><input list="vehicle-list" id="f-vehicle" placeholder="TN45AB1234" required></div>
+          <datalist id="vehicle-list"></datalist>
+          <div class="field"><label>Freight Ton (t)</label><input type="number" id="f-tons" min="0" step="0.1" value="0"></div>
+
+          <div class="field span2"><label>Route</label><input type="text" id="f-route" placeholder="Trichy → Chennai"></div>
+          <div class="field"><label>Freight Total Rent (₹)</label><input type="number" id="f-total-rent" min="0" step="1" value="0"></div>
+          <div class="field"><label>Received So Far (₹)</label><input type="number" id="f-income" min="0" step="1" value="0"></div>
+
+          <div class="field"><label>Commission Amount (₹)</label><input type="number" id="f-commission" min="0" step="1" value="0"></div>
+          <div class="field"><label>Loading / Unloading (₹)</label><input type="number" id="f-loading" min="0" step="1" value="0"></div>
+          <div class="field">
+            <label>Balance Amount Pending (₹)</label>
+            <input type="text" id="f-balance-pending" value="₹0" disabled>
+            <span class="sublabel">Auto-calculated — not editable</span>
+          </div>
+          <div class="field"><label>Diesel / Fuel (₹)</label><input type="number" id="f-fuel" min="0" step="1" value="0"></div>
+
+          <div class="field"><label>Toll (₹)</label><input type="number" id="f-toll" min="0" step="1" value="0"></div>
+          <div class="field">
+            <label>Driver Allowance (₹)</label>
+            <input type="text" id="f-allowance" value="₹0" disabled>
+            <span class="sublabel">Auto-calculated — 14% of Total Rent — not editable</span>
+          </div>
+          <div class="field"><label>Repair / Maintenance (₹)</label><input type="number" id="f-repair" min="0" step="1" value="0"></div>
+          <div class="field"><label>Other Expenses (₹)</label><input type="number" id="f-other" min="0" step="1" value="0"></div>
+        </div>
+
+        <div class="field driver-field-block">
+          <label>Driver(s)</label>
+          <div class="chip-row" id="f-drivers-picker"></div>
+          <div class="add-inline">
+            <input type="text" id="f-driver-new" placeholder="Add a driver, e.g. Murugan">
+            <button type="button" class="btn btn-sm" id="f-driver-add-btn">Add</button>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" id="f-submit">Add trip</button>
+          <button type="button" class="btn btn-ghost" id="f-cancel" style="display:none;">Cancel edit</button>
+          <span class="live-calc form-note">Expense <b id="live-expense">₹0</b> · Profit <b id="live-profit">₹0</b></span>
+        </div>
+      </form>
+    </div>
+
+    <div class="panel" style="padding:0; overflow-x:auto;">
+      <div style="padding:18px 20px 0;" class="panel-head">
+        <h2>Every trip, one row</h2>
+        <span class="hint" id="trip-count-hint"></span>
+      </div>
+      <div id="trip-table-wrap" style="padding:0 4px 14px;"></div>
+    </div>
+  </section>
+
+  <!-- VEHICLE MASTER -->
+  <section class="view" id="view-vehicles">
+    <div class="panel">
+      <div class="panel-head"><h2>Driver Roster</h2><span class="hint">Drivers are also added automatically from the Trip Log form</span></div>
+      <div class="chip-row" id="driver-roster"></div>
+      <div class="add-inline">
+        <input type="text" id="new-driver-name" placeholder="Add driver name">
+        <button class="btn" id="btn-add-driver">Add driver</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Fleet</h2><span class="hint">Tap a driver chip on a vehicle to assign or unassign them</span></div>
+      <div id="vehicle-grid" class="vehicle-grid"></div>
+      <div class="add-inline">
+        <input type="text" id="new-vehicle-no" placeholder="Add vehicle number, e.g. TN45AB1234">
+        <button class="btn" id="btn-add-vehicle">Add vehicle</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- MONTHLY SUMMARY -->
+  <section class="view" id="view-summary">
+    <div class="panel" style="padding:0; overflow-x:auto;">
+      <div style="padding:18px 20px 0;" class="panel-head">
+        <h2>Vehicle × Month</h2>
+        <span class="hint">Grouped by each trip's From Date — close a month once it's finalized</span>
+      </div>
+      <div id="summary-table-wrap" style="padding:0 4px 14px;"></div>
+    </div>
+  </section>
+
+  <!-- LOAN / EMI -->
+  <section class="view" id="view-loans">
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Add a vehicle loan</h2>
+        <span class="hint">Monthly EMI is split evenly across the tenure (no interest assumed)</span>
+      </div>
+      <form id="loan-form">
+        <div class="form-grid">
+          <div class="field"><label>Vehicle *</label><select id="lf-vehicle" required></select></div>
+          <div class="field"><label>Total Loan Amount (₹) *</label><input type="number" id="lf-amount" min="1" step="1" required></div>
+          <div class="field"><label>No. of Months *</label><input type="number" id="lf-months" min="1" step="1" required></div>
+          <div class="field"><label>Loan Start Date *</label><input type="date" id="lf-start" required></div>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Add loan</button>
+          <span class="live-calc form-note">Monthly EMI <b id="lf-emi-preview">₹0</b></span>
+        </div>
+      </form>
+    </div>
+
+    <div id="loan-list"></div>
+  </section>
+
+</div>
+
+<div id="toast-wrap"></div>
+
+<!-- Close month modal -->
+<div class="modal-backdrop" id="close-modal">
+  <div class="modal">
+    <h3>Close this month?</h3>
+    <p class="modal-sub" id="close-modal-sub"></p>
+    <div class="summary-grid" id="close-modal-stats"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="close-modal-cancel">Cancel</button>
+      <button class="btn btn-primary" id="close-modal-confirm">Close month</button>
+    </div>
+  </div>
+</div>
+
+<!-- Record payment modal -->
+<div class="modal-backdrop" id="payment-modal">
+  <div class="modal">
+    <h3>Record a payment received</h3>
+    <p class="modal-sub" id="payment-modal-sub"></p>
+    <div class="form-grid" style="grid-template-columns:1fr 1fr;">
+      <div class="field"><label>Amount Received (₹)</label><input type="number" id="pm-amount" min="0" step="1"></div>
+      <div class="field"><label>Date</label><input type="date" id="pm-date"></div>
+    </div>
+    <div id="payment-history"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="payment-modal-cancel">Cancel</button>
+      <button class="btn btn-primary" id="payment-modal-confirm">Add payment</button>
+    </div>
+  </div>
+</div>
+
+<!-- Generic confirm modal (reopen / delete / load-from-drive overwrite) -->
+<div class="modal-backdrop" id="confirm-modal">
+  <div class="modal">
+    <h3 id="confirm-title">Are you sure?</h3>
+    <p class="modal-sub" id="confirm-sub"></p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="confirm-cancel">Cancel</button>
+      <button class="btn btn-primary" id="confirm-ok">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- Google Drive setup modal -->
+<div class="modal-backdrop" id="settings-modal">
+  <div class="modal">
+    <h3>Google Drive setup</h3>
+    <p class="modal-sub">Paste the OAuth Client ID from your own Google Cloud project. It's stored only in this browser — never sent anywhere except Google's own sign-in popup.</p>
+    <div class="field">
+      <label>Google OAuth Client ID</label>
+      <input type="text" id="settings-client-id" placeholder="xxxxxxxxxx.apps.googleusercontent.com">
+      <span class="sublabel">Ends in .apps.googleusercontent.com</span>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="settings-cancel">Cancel</button>
+      <button class="btn btn-primary" id="settings-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Drive sync progress modal -->
+<div class="modal-backdrop" id="sync-modal">
+  <div class="modal">
+    <h3 id="sync-modal-title">Syncing to Drive…</h3>
+    <p class="modal-sub">Keep this tab open until this finishes.</p>
+    <div class="progress-line" id="sync-modal-line">Starting…</div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="sync-modal-close" style="display:none;">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ============================ STATE ============================ */
+  const state = { vehicles: [], drivers: [], vehicleDrivers: {}, trips: [], loans: [] };
+  let editingTripId = null;
+  let pendingConfirm = null;
+  let formSelectedDrivers = [];
+  let paymentModalTripId = null;
+  let expandedLoans = new Set();
+
+  const DRIVE_FOLDER_NAME = "Trip Ledger Data";
+  const DRIVE_FILE_NAME = "trip-ledger-data.json";
+  const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+  let gisTokenClient = null;
+  let driveAccessToken = null;
+  let driveTokenExpiry = 0;
+
+  /* ============================ HELPERS ============================ */
+  const $ = (id) => document.getElementById(id);
+  const inr = (n) => "₹" + Math.round(n || 0).toLocaleString("en-IN");
+  const inrSigned = (n) => (n < 0 ? "-" : "") + inr(Math.abs(n||0));
+  const monthLabel = (dateStr) => {
+    if (!dateStr) return "";
+    const d = new Date(dateStr + "T00:00:00");
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    return months[d.getMonth()] + "-" + d.getFullYear();
+  };
+  const tripAllowance = (t) => Math.round((t.totalRent||0) * 0.14);
+  const tripExpense = (t) => tripAllowance(t)+(t.fuel||0)+(t.toll||0)+(t.loading||0)+(t.repair||0)+(t.other||0);
+  const tripProfit = (t) => (t.income||0) - tripExpense(t);
+  // Balance Amount Pending = Freight Total Rent - (Received So Far + Commission + Loading/Unloading)
+  const tripPending = (t) => (t.totalRent||0) - ((t.income||0) + (t.commission||0) + (t.loading||0));
+
+  function nextLoanId(){
+    let max = 0;
+    state.loans.forEach(l=>{
+      const m = /^LOAN-(\d+)$/.exec(l.id || "");
+      if (m) max = Math.max(max, parseInt(m[1],10));
+    });
+    return "LOAN-" + String(max+1).padStart(4,"0");
+  }
+
+  function addMonthsClamped(dateStr, n){
+    const d = new Date(dateStr + "T00:00:00");
+    const day = d.getDate();
+    d.setMonth(d.getMonth() + n);
+    if (d.getDate() !== day) d.setDate(0); // clamp to last day of intended month
+    return d.toISOString().slice(0,10);
+  }
+
+  function buildInstallments(totalAmount, months, startDate){
+    const base = Math.floor(totalAmount / months);
+    const remainder = totalAmount - base * months;
+    const out = [];
+    for (let i=0;i<months;i++){
+      out.push({
+        seq: i+1,
+        dueDate: addMonthsClamped(startDate, i),
+        amount: (i === months-1) ? base + remainder : base,
+        paid: false,
+        paidDate: null
+      });
+    }
+    return out;
+  }
+
+  const loanPaidCount = (loan) => loan.installments.filter(i=>i.paid).length;
+  const loanPaidAmount = (loan) => loan.installments.reduce((s,i)=> s + (i.paid ? i.amount : 0), 0);
+  const loanOutstanding = (loan) => (loan.totalAmount||0) - loanPaidAmount(loan);
+
+  function toast(msg, kind){
+    const el = document.createElement("div");
+    el.className = "toast" + (kind ? " " + kind : "");
+    el.textContent = msg;
+    $("toast-wrap").appendChild(el);
+    setTimeout(()=>{ el.style.opacity="0"; el.style.transition="opacity .3s"; setTimeout(()=>el.remove(),300); }, 3800);
+  }
+
+  function nextTripId(){
+    let max = 0;
+    state.trips.forEach(t=>{
+      const m = /^TRP-(\d+)$/.exec(t.id || "");
+      if (m) max = Math.max(max, parseInt(m[1],10));
+    });
+    return "TRP-" + String(max+1).padStart(4,"0");
+  }
+
+  function ensureVehicle(no){
+    if (!no) return null;
+    const norm = no.trim().toUpperCase().replace(/\s+/g,"");
+    if (!norm) return null;
+    if (!state.vehicles.includes(norm)) state.vehicles.push(norm);
+    return norm;
+  }
+
+  function ensureDriver(name){
+    if (!name) return null;
+    const trimmed = name.trim();
+    if (!trimmed) return null;
+    const existing = state.drivers.find(d=>d.toLowerCase()===trimmed.toLowerCase());
+    if (existing) return existing;
+    state.drivers.push(trimmed);
+    return trimmed;
+  }
+
+  /* ============================ LOCAL PERSISTENCE ============================ */
+  // Self-hosted build: uses the browser's own localStorage (per-browser, per-device).
+  async function persistLocal(){
+    try{
+      localStorage.setItem("tracker-data", JSON.stringify({
+        vehicles: state.vehicles, drivers: state.drivers,
+        vehicleDrivers: state.vehicleDrivers, trips: state.trips, loans: state.loans
+      }));
+    }catch(e){ console.error("local save failed", e); }
+  }
+  async function loadLocal(){
+    try{
+      const raw = localStorage.getItem("tracker-data");
+      if (raw){
+        const parsed = JSON.parse(raw);
+        state.vehicles = parsed.vehicles || [];
+        state.drivers = parsed.drivers || [];
+        state.vehicleDrivers = parsed.vehicleDrivers || {};
+        state.trips = parsed.trips || [];
+        state.loans = parsed.loans || [];
+      }
+    }catch(e){ /* nothing saved yet */ }
+  }
+  async function getSetting(key){
+    try{ return localStorage.getItem(key); }catch(e){ return null; }
+  }
+  async function setSetting(key, val){
+    try{ localStorage.setItem(key, val); }catch(e){ /* non-fatal */ }
+  }
+
+  /* ============================ RENDER ============================ */
+  function render(){
+    renderVehicleDatalist();
+    renderDriverPicker();
+    renderTripTable();
+    renderVehicleGrid();
+    renderDriverRoster();
+    renderSummaryTable();
+    renderLoanVehicleSelect();
+    renderLoans();
+    persistLocal();
+  }
+
+  function renderVehicleDatalist(){
+    $("vehicle-list").innerHTML = state.vehicles.map(v=>`<option value="${v}">`).join("");
+  }
+
+  function renderDriverPicker(){
+    const wrap = $("f-drivers-picker");
+    if (!state.drivers.length){
+      wrap.innerHTML = `<span class="hint">No drivers yet — add one below</span>`;
+      return;
+    }
+    wrap.innerHTML = state.drivers.map(d=>{
+      const on = formSelectedDrivers.includes(d);
+      return `<button type="button" class="chip ${on?"chip-on":""}" data-driver="${d}">${d}</button>`;
+    }).join("");
+    wrap.querySelectorAll(".chip").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const d = btn.dataset.driver;
+        if (formSelectedDrivers.includes(d)) formSelectedDrivers = formSelectedDrivers.filter(x=>x!==d);
+        else formSelectedDrivers.push(d);
+        renderDriverPicker();
+      });
+    });
+  }
+
+  function renderDriverRoster(){
+    const wrap = $("driver-roster");
+    if (!state.drivers.length){
+      wrap.innerHTML = `<span class="hint">No drivers yet — add one below, or they'll be added automatically from the Trip Log form</span>`;
+      return;
+    }
+    wrap.innerHTML = state.drivers.map(d=>
+      `<span class="roster-chip">${d}<button type="button" class="chip-remove" data-driver="${d}" title="Remove driver">✕</button></span>`
+    ).join("");
+    wrap.querySelectorAll(".chip-remove").forEach(btn=>{
+      btn.addEventListener("click",()=> removeDriver(btn.dataset.driver));
+    });
+  }
+
+  function renderTripTable(){
+    const wrap = $("trip-table-wrap");
+    $("trip-count-hint").textContent = state.trips.length + " trip" + (state.trips.length===1?"":"s") + " logged";
+    if (!state.trips.length){
+      wrap.innerHTML = `<div class="empty"><div class="big">No trips yet</div>Add your first trip above — even just the date, vehicle, and income is enough to start.</div>`;
+      return;
+    }
+    const rows = [...state.trips]
+      .sort((a,b)=> (b.dateFrom||"").localeCompare(a.dateFrom||"") || (b.id||"").localeCompare(a.id||""))
+      .map(t=>{
+        const exp = tripExpense(t), profit = tripProfit(t), pending = tripPending(t);
+        const closed = t.status === "Closed";
+        const dateDisplay = (t.dateTo && t.dateTo !== t.dateFrom) ? `${t.dateFrom} → ${t.dateTo}` : (t.dateFrom||"");
+        const driverDisplay = (t.drivers && t.drivers.length) ? t.drivers.join(", ") : "—";
+        const tonDisplay = t.tons ? t.tons.toFixed(1) : "—";
+        return `<tr data-id="${t.id}">
+          <td><span class="trip-tag">${t.id}</span></td>
+          <td class="mono">${dateDisplay}</td>
+          <td class="mono">${t.vehicle||""}</td>
+          <td class="num">${tonDisplay}</td>
+          <td>${driverDisplay}</td>
+          <td><div class="route-cell">${(t.route||"—")}</div></td>
+          <td class="num">${inr(t.totalRent)}</td>
+          <td class="num">${inr(t.commission)}</td>
+          <td class="num">${inr(t.income)}</td>
+          <td class="num ${pending>0?"pending-due":"pending-clear"}">${inrSigned(pending)}</td>
+          <td class="num">${inr(exp)}</td>
+          <td class="num ${profit>=0?"profit-pos":"profit-neg"}">${inrSigned(profit)}</td>
+          <td><span class="stamp ${closed?"stamp-closed":"stamp-open"}">${closed?"Closed":"Open"}</span></td>
+          <td>
+            <div class="row-actions">
+              <button class="icon-btn pay" data-action="payment" title="Record payment received">₹+</button>
+              <button class="icon-btn" data-action="edit" title="Edit">✎</button>
+              <button class="icon-btn" data-action="delete" title="Delete">🗑</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join("");
+    wrap.innerHTML = `<table>
+      <thead><tr>
+        <th>Trip</th><th>Date(s)</th><th>Vehicle</th><th class="num">Ton</th><th>Driver(s)</th><th>Route</th>
+        <th class="num">Total Rent</th><th class="num">Commission</th><th class="num">Received</th><th class="num">Pending</th>
+        <th class="num">Expense</th><th class="num">Profit</th><th>Status</th><th></th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+
+    wrap.querySelectorAll("button[data-action]").forEach(btn=>{
+      btn.addEventListener("click", (e)=>{
+        const id = e.target.closest("tr").dataset.id;
+        const action = btn.dataset.action;
+        if (action === "edit") startEditTrip(id);
+        if (action === "delete") deleteTrip(id);
+        if (action === "payment") openPaymentModal(id);
+      });
+    });
+  }
+
+  function renderVehicleGrid(){
+    const grid = $("vehicle-grid");
+    if (!state.vehicles.length){
+      grid.innerHTML = `<div class="empty" style="grid-column:1/-1;"><div class="big">No vehicles yet</div>Add one below, or just log a trip and the vehicle will be added automatically.</div>`;
+      return;
+    }
+    grid.innerHTML = state.vehicles.map(v=>{
+      const trips = state.trips.filter(t=>t.vehicle===v);
+      const profit = trips.reduce((s,t)=>s+tripProfit(t),0);
+      const assigned = state.vehicleDrivers[v] || [];
+      const driverChips = state.drivers.length
+        ? state.drivers.map(d=>`<button type="button" class="chip ${assigned.includes(d)?"chip-on":""}" data-veh="${v}" data-driver="${d}">${d}</button>`).join("")
+        : `<span class="hint">No drivers in roster yet</span>`;
+      return `<div class="vehicle-card" data-veh="${v}">
+        <button class="icon-btn remove-veh" data-action="remove-vehicle" title="Remove vehicle">✕</button>
+        <div class="veh-no">${v}</div>
+        <div class="veh-stats">
+          ${trips.length} trip${trips.length===1?"":"s"}<br>
+          Profit so far: <span class="${profit>=0?"profit-pos":"profit-neg"}">${inr(profit)}</span>
+        </div>
+        <div class="veh-drivers-label">Drivers</div>
+        <div class="chip-row">${driverChips}</div>
+      </div>`;
+    }).join("");
+    grid.querySelectorAll("[data-action='remove-vehicle']").forEach(btn=>{
+      btn.addEventListener("click",(e)=>{
+        const v = e.target.closest(".vehicle-card").dataset.veh;
+        removeVehicle(v);
+      });
+    });
+    grid.querySelectorAll(".chip[data-driver]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const v = btn.dataset.veh, d = btn.dataset.driver;
+        const arr = state.vehicleDrivers[v] || (state.vehicleDrivers[v] = []);
+        const idx = arr.indexOf(d);
+        if (idx >= 0) arr.splice(idx,1); else arr.push(d);
+        renderVehicleGrid();
+        persistLocal();
+      });
+    });
+  }
+
+  function renderSummaryTable(){
+    const wrap = $("summary-table-wrap");
+    const combos = {};
+    state.trips.forEach(t=>{
+      if (!t.vehicle || !t.dateFrom) return;
+      const m = monthLabel(t.dateFrom);
+      const key = t.vehicle + "|" + m;
+      if (!combos[key]) combos[key] = {vehicle:t.vehicle, month:m, trips:[]};
+      combos[key].trips.push(t);
+    });
+    const list = Object.values(combos).sort((a,b)=> a.vehicle.localeCompare(b.vehicle) || a.month.localeCompare(b.month));
+    if (!list.length){
+      wrap.innerHTML = `<div class="empty"><div class="big">Nothing to summarize yet</div>Summaries appear automatically once you log trips.</div>`;
+      return;
+    }
+    const rows = list.map(c=>{
+      const totalRent = c.trips.reduce((s,t)=>s+(t.totalRent||0),0);
+      const commission = c.trips.reduce((s,t)=>s+(t.commission||0),0);
+      const income = c.trips.reduce((s,t)=>s+(t.income||0),0);
+      const expense = c.trips.reduce((s,t)=>s+tripExpense(t),0);
+      const pending = c.trips.reduce((s,t)=>s+tripPending(t),0);
+      const tons = c.trips.reduce((s,t)=>s+(t.tons||0),0);
+      const profit = income - expense;
+      const allClosed = c.trips.every(t=>t.status==="Closed");
+      return `<tr data-veh="${c.vehicle}" data-month="${c.month}">
+        <td class="mono">${c.vehicle}</td>
+        <td class="mono">${c.month}</td>
+        <td class="num">${c.trips.length}</td>
+        <td class="num">${tons ? tons.toFixed(1) : "—"}</td>
+        <td class="num">${inr(totalRent)}</td>
+        <td class="num">${inr(commission)}</td>
+        <td class="num">${inr(income)}</td>
+        <td class="num ${pending>0?"pending-due":"pending-clear"}">${inrSigned(pending)}</td>
+        <td class="num">${inr(expense)}</td>
+        <td class="num ${profit>=0?"profit-pos":"profit-neg"}">${inr(profit)}</td>
+        <td><span class="stamp ${allClosed?"stamp-closed":"stamp-open"}">${allClosed?"Closed":"Open"}</span></td>
+        <td>${allClosed ? "" : `<button class="btn btn-sm" data-action="close-month">Close month</button>`}</td>
+      </tr>`;
+    }).join("");
+    wrap.innerHTML = `<table>
+      <thead><tr>
+        <th>Vehicle</th><th>Month</th><th class="num">Trips</th><th class="num">Ton</th><th class="num">Total Rent</th>
+        <th class="num">Commission</th><th class="num">Received</th><th class="num">Pending</th><th class="num">Expense</th><th class="num">Profit</th><th>Status</th><th></th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+    wrap.querySelectorAll("[data-action='close-month']").forEach(btn=>{
+      btn.addEventListener("click",(e)=>{
+        const tr = e.target.closest("tr");
+        openCloseModal(tr.dataset.veh, tr.dataset.month);
+      });
+    });
+  }
+
+  /* ============================ LOAN / EMI ============================ */
+  function renderLoanVehicleSelect(){
+    const sel = $("lf-vehicle");
+    const current = sel.value;
+    sel.innerHTML = `<option value="">Select vehicle</option>` + state.vehicles.map(v=>`<option value="${v}">${v}</option>`).join("");
+    if (state.vehicles.includes(current)) sel.value = current;
+  }
+
+  function recalcLoanPreview(){
+    const amt = parseFloat($("lf-amount").value) || 0;
+    const months = parseInt($("lf-months").value, 10) || 0;
+    const emi = months > 0 ? Math.round(amt / months) : 0;
+    $("lf-emi-preview").textContent = inr(emi);
+  }
+  $("lf-amount").addEventListener("input", recalcLoanPreview);
+  $("lf-months").addEventListener("input", recalcLoanPreview);
+
+  $("loan-form").addEventListener("submit",(e)=>{
+    e.preventDefault();
+    const vehicle = $("lf-vehicle").value;
+    const amount = parseFloat($("lf-amount").value) || 0;
+    const months = parseInt($("lf-months").value, 10) || 0;
+    const start = $("lf-start").value;
+    if (!vehicle || !amount || !months || !start){
+      toast("Vehicle, total amount, months and start date are all required.", "err");
+      return;
+    }
+    const id = nextLoanId();
+    const installments = buildInstallments(amount, months, start);
+    state.loans.push({
+      id, vehicle, totalAmount: amount, months, startDate: start,
+      emi: Math.round(amount / months), installments
+    });
+    $("loan-form").reset();
+    recalcLoanPreview();
+    renderLoans();
+    persistLocal();
+    toast(`Loan ${id} added for ${vehicle}: ${months} months at ${inr(Math.round(amount/months))}/month.`, "ok");
+  });
+
+  function renderLoans(){
+    const wrap = $("loan-list");
+    if (!state.loans.length){
+      wrap.innerHTML = `<div class="empty"><div class="big">No loans yet</div>Add a vehicle loan above to start tracking its EMI schedule.</div>`;
+      return;
+    }
+    wrap.innerHTML = state.loans.map(loan=>{
+      const paidCount = loanPaidCount(loan);
+      const outstanding = loanOutstanding(loan);
+      const expanded = expandedLoans.has(loan.id);
+      const rows = loan.installments.map(inst=>`
+        <tr>
+          <td class="mono">${inst.seq}</td>
+          <td class="mono">${inst.dueDate}</td>
+          <td class="num">${inr(inst.amount)}</td>
+          <td><span class="stamp ${inst.paid?"stamp-closed":"stamp-open"}">${inst.paid?"Paid":"Pending"}</span></td>
+          <td><button class="btn btn-sm" data-action="${inst.paid?"unmark-paid":"mark-paid"}" data-loan="${loan.id}" data-seq="${inst.seq}">${inst.paid?"Mark unpaid":"Mark paid"}</button></td>
+        </tr>`).join("");
+      return `<div class="panel">
+        <div class="panel-head">
+          <h2>${loan.vehicle} <span class="trip-tag">${loan.id}</span></h2>
+          <div class="row-actions">
+            <button class="btn btn-sm" data-action="toggle-loan" data-loan="${loan.id}">${expanded?"Hide schedule ▴":"View schedule ▾"}</button>
+            <button class="icon-btn" data-action="delete-loan" data-loan="${loan.id}" title="Delete loan">🗑</button>
+          </div>
+        </div>
+        <div class="summary-grid" style="grid-template-columns:repeat(4,1fr);">
+          <div class="stat"><div class="lab">Total Loan</div><div class="val">${inr(loan.totalAmount)}</div></div>
+          <div class="stat"><div class="lab">Monthly EMI</div><div class="val">${inr(loan.emi)}</div></div>
+          <div class="stat"><div class="lab">Paid</div><div class="val">${paidCount} / ${loan.months}</div></div>
+          <div class="stat"><div class="lab">Outstanding</div><div class="val ${outstanding>0?"pending-due":"pending-clear"}">${inr(outstanding)}</div></div>
+        </div>
+        ${expanded ? `<table style="margin-top:14px;">
+          <thead><tr><th>#</th><th>Due Date</th><th class="num">Amount</th><th>Status</th><th></th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>` : ""}
+      </div>`;
+    }).join("");
+
+    wrap.querySelectorAll("[data-action='toggle-loan']").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.dataset.loan;
+        if (expandedLoans.has(id)) expandedLoans.delete(id); else expandedLoans.add(id);
+        renderLoans();
+      });
+    });
+    wrap.querySelectorAll("[data-action='delete-loan']").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.dataset.loan;
+        const loan = state.loans.find(l=>l.id===id);
+        if (!loan) return;
+        if (loanPaidCount(loan) > 0){
+          toast("Can't delete a loan with paid installments — that would lose payment history.", "err");
+          return;
+        }
+        askConfirm("Delete this loan?", `${loan.id} for ${loan.vehicle} will be removed.`, ()=>{
+          state.loans = state.loans.filter(l=>l.id!==id);
+          renderLoans();
+          persistLocal();
+        });
+      });
+    });
+    wrap.querySelectorAll("[data-action='mark-paid'],[data-action='unmark-paid']").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const loanId = btn.dataset.loan, seq = parseInt(btn.dataset.seq,10);
+        const loan = state.loans.find(l=>l.id===loanId);
+        if (!loan) return;
+        const inst = loan.installments.find(i=>i.seq===seq);
+        if (!inst) return;
+        if (!inst.paid){
+          askConfirm("Mark installment as paid?",
+            `Month ${seq} of ${loan.id} (${loan.vehicle}) — ${inr(inst.amount)} due ${inst.dueDate} — will be marked Paid.`,
+            ()=>{
+              inst.paid = true;
+              inst.paidDate = new Date().toISOString().slice(0,10);
+              renderLoans(); persistLocal();
+              toast(`Month ${seq} marked paid for ${loan.id}.`, "ok");
+            });
+        } else {
+          askConfirm("Mark installment as unpaid?",
+            `Month ${seq} of ${loan.id} (${loan.vehicle}) will be reverted to Pending.`,
+            ()=>{
+              inst.paid = false;
+              inst.paidDate = null;
+              renderLoans(); persistLocal();
+              toast(`Month ${seq} reverted to pending for ${loan.id}.`);
+            });
+        }
+      });
+    });
+  }
+
+  /* ============================ TRIP FORM ============================ */
+  const liveCalcIds = ["total-rent","income","commission","fuel","toll","loading","repair","other"];
+
+  function recalcLive(){
+    const get = (id)=> parseFloat($("f-"+id).value) || 0;
+    const totalRent = get("total-rent");
+    const allowance = Math.round(totalRent * 0.14);
+    $("f-allowance").value = inr(allowance);
+    const exp = allowance + get("fuel")+get("toll")+get("loading")+get("repair")+get("other");
+    const profit = get("income") - exp;
+    const balance = totalRent - (get("income") + get("commission") + get("loading"));
+    $("live-expense").textContent = inr(exp);
+    $("live-profit").textContent = inrSigned(profit);
+    $("live-profit").className = profit>=0 ? "profit-pos" : "profit-neg";
+    const balField = $("f-balance-pending");
+    balField.value = inrSigned(balance);
+    balField.classList.remove("pending-due","pending-clear");
+    balField.classList.add(balance>0 ? "pending-due" : "pending-clear");
+  }
+  liveCalcIds.forEach(id=> $("f-"+id).addEventListener("input", recalcLive));
+
+  function resetForm(){
+    editingTripId = null;
+    $("trip-form").reset();
+    $("f-trip-id").value = "";
+    $("trip-form-title").textContent = "Add a trip";
+    $("f-submit").textContent = "Add trip";
+    $("f-cancel").style.display = "none";
+    ["total-rent","income","commission","fuel","toll","loading","repair","other","tons"].forEach(id=> $("f-"+id).value = 0);
+    formSelectedDrivers = [];
+    renderDriverPicker();
+    recalcLive();
+  }
+
+  function startEditTrip(id){
+    const t = state.trips.find(x=>x.id===id);
+    if (!t) return;
+    const openEditor = ()=>{
+      editingTripId = id;
+      $("f-trip-id").value = t.id;
+      $("f-date-from").value = t.dateFrom||"";
+      $("f-date-to").value = (t.dateTo && t.dateTo !== t.dateFrom) ? t.dateTo : "";
+      $("f-vehicle").value = t.vehicle||"";
+      $("f-tons").value = t.tons||0;
+      $("f-route").value = t.route||"";
+      $("f-total-rent").value = t.totalRent||0;
+      $("f-commission").value = t.commission||0;
+      $("f-income").value = t.income||0;
+      $("f-fuel").value = t.fuel||0;
+      $("f-toll").value = t.toll||0;
+      $("f-loading").value = t.loading||0;
+      $("f-repair").value = t.repair||0;
+      $("f-other").value = t.other||0;
+      formSelectedDrivers = (t.drivers||[]).slice();
+      renderDriverPicker();
+      $("trip-form-title").textContent = "Editing " + t.id;
+      $("f-submit").textContent = "Save changes";
+      $("f-cancel").style.display = "inline-block";
+      recalcLive();
+      $("trip-form").scrollIntoView({behavior:"smooth", block:"start"});
+    };
+    if (t.status === "Closed"){
+      askConfirm("Reopen this trip?",
+        `${t.id} was closed for ${monthLabel(t.dateFrom)}. Editing it will reopen it so it shows as Open again — close the month again afterward if needed.`,
+        ()=>{ t.status = "Open"; openEditor(); render(); });
+    } else {
+      openEditor();
+    }
+  }
+
+  function deleteTrip(id){
+    const t = state.trips.find(x=>x.id===id);
+    if (!t) return;
+    if (t.status === "Closed"){
+      toast("That trip is closed — reopen it first (edit it) before deleting.", "err");
+      return;
+    }
+    askConfirm("Delete this trip?", `${t.id} (${t.dateFrom}, ${t.vehicle}) will be removed. This can't be undone.`, ()=>{
+      state.trips = state.trips.filter(x=>x.id!==id);
+      render();
+      toast("Trip deleted.");
+    });
+  }
+
+  $("trip-form").addEventListener("submit",(e)=>{
+    e.preventDefault();
+    const vehicle = ensureVehicle($("f-vehicle").value);
+    const dateFrom = $("f-date-from").value;
+    let dateTo = $("f-date-to").value || dateFrom;
+    if (!dateFrom || !vehicle){ toast("From Date and vehicle are required.", "err"); return; }
+    if (dateTo < dateFrom){ toast("To Date can't be before From Date.", "err"); return; }
+    const payload = {
+      dateFrom: dateFrom,
+      dateTo: dateTo,
+      vehicle: vehicle,
+      tons: parseFloat($("f-tons").value)||0,
+      drivers: formSelectedDrivers.slice(),
+      route: $("f-route").value.trim(),
+      totalRent: parseFloat($("f-total-rent").value)||0,
+      commission: parseFloat($("f-commission").value)||0,
+      income: parseFloat($("f-income").value)||0,
+      fuel: parseFloat($("f-fuel").value)||0,
+      toll: parseFloat($("f-toll").value)||0,
+      loading: parseFloat($("f-loading").value)||0,
+      repair: parseFloat($("f-repair").value)||0,
+      other: parseFloat($("f-other").value)||0,
+    };
+    if (editingTripId){
+      const t = state.trips.find(x=>x.id===editingTripId);
+      Object.assign(t, payload);
+      toast("Trip " + t.id + " updated.");
+    } else {
+      const id = nextTripId();
+      state.trips.push(Object.assign({id, status:"Open", paymentLog:[]}, payload));
+      toast("Trip " + id + " added.");
+    }
+    resetForm();
+    render();
+  });
+  $("f-cancel").addEventListener("click", resetForm);
+
+  $("f-driver-add-btn").addEventListener("click", ()=>{
+    const input = $("f-driver-new");
+    const d = ensureDriver(input.value);
+    if (!d){ toast("Enter a driver name first.", "err"); return; }
+    if (!formSelectedDrivers.includes(d)) formSelectedDrivers.push(d);
+    input.value = "";
+    renderDriverPicker();
+    renderDriverRoster();
+    persistLocal();
+  });
+  $("f-driver-new").addEventListener("keydown",(e)=>{
+    if (e.key === "Enter"){ e.preventDefault(); $("f-driver-add-btn").click(); }
+  });
+
+  /* ============================ RECORD PAYMENT ============================ */
+  function openPaymentModal(tripId){
+    const t = state.trips.find(x=>x.id===tripId);
+    if (!t) return;
+    paymentModalTripId = tripId;
+    const pending = tripPending(t);
+    $("payment-modal-sub").textContent =
+      `${t.id} · ${t.vehicle} — Total Rent ${inr(t.totalRent||0)}, received so far ${inr(t.income||0)}, balance pending ${inrSigned(pending)}.`;
+    $("pm-amount").value = "";
+    $("pm-date").value = new Date().toISOString().slice(0,10);
+    renderPaymentHistory(t);
+    $("payment-modal").classList.add("show");
+  }
+
+  function renderPaymentHistory(t){
+    const wrap = $("payment-history");
+    if (!t.paymentLog || !t.paymentLog.length){
+      wrap.innerHTML = `<div class="payment-history-label">Payment history</div><span class="hint">No additional payments recorded yet.</span>`;
+      return;
+    }
+    const rows = t.paymentLog.slice().reverse().map(p=>
+      `<div class="payment-row"><span>${p.date}</span><span>${inr(p.amount)}</span></div>`
+    ).join("");
+    wrap.innerHTML = `<div class="payment-history-label">Payment history</div>${rows}`;
+  }
+
+  $("payment-modal-cancel").addEventListener("click", ()=>{
+    $("payment-modal").classList.remove("show");
+    paymentModalTripId = null;
+  });
+  $("payment-modal-confirm").addEventListener("click", ()=>{
+    const t = state.trips.find(x=>x.id===paymentModalTripId);
+    if (!t) return;
+    const amt = parseFloat($("pm-amount").value);
+    if (!amt || amt <= 0){ toast("Enter a payment amount first.", "err"); return; }
+    const date = $("pm-date").value || new Date().toISOString().slice(0,10);
+    t.income = (t.income||0) + amt;
+    t.paymentLog = t.paymentLog || [];
+    t.paymentLog.push({date, amount: amt});
+    $("payment-modal").classList.remove("show");
+    paymentModalTripId = null;
+    render();
+    toast(`Recorded ${inr(amt)} received for ${t.id}. Balance pending now ${inrSigned(tripPending(t))}.`, "ok");
+  });
+
+  /* ============================ VEHICLES & DRIVERS (master tab) ============================ */
+  $("btn-add-vehicle").addEventListener("click",()=>{
+    const input = $("new-vehicle-no");
+    const v = ensureVehicle(input.value);
+    if (!v){ toast("Enter a vehicle number first.", "err"); return; }
+    input.value = "";
+    render();
+    toast("Vehicle " + v + " added.");
+  });
+
+  function removeVehicle(v){
+    const used = state.trips.some(t=>t.vehicle===v);
+    if (used){
+      toast(`Can't remove ${v} — it has trips logged against it.`, "err");
+      return;
+    }
+    askConfirm("Remove vehicle?", `${v} will be removed from the Vehicle Master list.`, ()=>{
+      state.vehicles = state.vehicles.filter(x=>x!==v);
+      delete state.vehicleDrivers[v];
+      render();
+    });
+  }
+
+  $("btn-add-driver").addEventListener("click", ()=>{
+    const input = $("new-driver-name");
+    const d = ensureDriver(input.value);
+    if (!d){ toast("Enter a driver name first.", "err"); return; }
+    input.value = "";
+    render();
+    toast("Driver " + d + " added.");
+  });
+
+  function removeDriver(d){
+    const usedInTrips = state.trips.some(t=> (t.drivers||[]).includes(d));
+    const usedInVehicles = Object.values(state.vehicleDrivers).some(arr=> (arr||[]).includes(d));
+    if (usedInTrips || usedInVehicles){
+      toast(`Can't remove ${d} — still referenced in trips or vehicle assignments.`, "err");
+      return;
+    }
+    askConfirm("Remove driver?", `${d} will be removed from the roster.`, ()=>{
+      state.drivers = state.drivers.filter(x=>x!==d);
+      render();
+    });
+  }
+
+  /* ============================ CLOSE MONTH ============================ */
+  function openCloseModal(vehicle, month){
+    const trips = state.trips.filter(t=>t.vehicle===vehicle && monthLabel(t.dateFrom)===month && t.status==="Open");
+    const income = trips.reduce((s,t)=>s+(t.income||0),0);
+    const expense = trips.reduce((s,t)=>s+tripExpense(t),0);
+    $("close-modal-sub").textContent = `${vehicle} · ${month} — every Open trip in this month will be marked Closed.`;
+    $("close-modal-stats").innerHTML = `
+      <div class="stat"><div class="lab">Trips</div><div class="val">${trips.length}</div></div>
+      <div class="stat"><div class="lab">Income</div><div class="val">${inr(income)}</div></div>
+      <div class="stat"><div class="lab">Expense</div><div class="val">${inr(expense)}</div></div>
+      <div class="stat"><div class="lab">Profit</div><div class="val ${income-expense>=0?"profit-pos":"profit-neg"}">${inr(income-expense)}</div></div>`;
+    $("close-modal").classList.add("show");
+    $("close-modal-confirm").onclick = ()=>{
+      trips.forEach(t=> t.status = "Closed");
+      $("close-modal").classList.remove("show");
+      render();
+      toast(`Closed ${vehicle} for ${month}: ${trips.length} trip(s), profit ${inr(income-expense)}.`, "ok");
+    };
+  }
+  $("close-modal-cancel").addEventListener("click",()=> $("close-modal").classList.remove("show"));
+
+  /* ============================ GENERIC CONFIRM ============================ */
+  function askConfirm(title, sub, onConfirm){
+    $("confirm-title").textContent = title;
+    $("confirm-sub").textContent = sub;
+    pendingConfirm = onConfirm;
+    $("confirm-modal").classList.add("show");
+  }
+  $("confirm-ok").addEventListener("click", ()=>{
+    $("confirm-modal").classList.remove("show");
+    if (pendingConfirm) pendingConfirm();
+    pendingConfirm = null;
+  });
+  $("confirm-cancel").addEventListener("click", ()=>{
+    $("confirm-modal").classList.remove("show");
+    pendingConfirm = null;
+  });
+
+  /* ============================ TABS ============================ */
+  document.querySelectorAll(".tab").forEach(tab=>{
+    tab.addEventListener("click", ()=>{
+      document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+      document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+      tab.classList.add("active");
+      $("view-"+tab.dataset.view).classList.add("active");
+    });
+  });
+
+  /* ============================ SYNC STATUS UI ============================ */
+  function setSyncStatus(kind, text){
+    const dot = $("sync-dot");
+    dot.className = "sync-dot" + (kind==="busy"?" busy":kind==="ok"?" ok":kind==="err"?" err":"");
+    $("sync-text").textContent = text;
+  }
+
+  function openSyncModal(title){
+    $("sync-modal-title").textContent = title;
+    $("sync-modal-line").textContent = "Starting…";
+    $("sync-modal-close").style.display = "none";
+    $("sync-modal").classList.add("show");
+  }
+  function updateSyncModal(line){ $("sync-modal-line").textContent = line; }
+  function finishSyncModal(line, allowClose){
+    $("sync-modal-line").textContent = line;
+    if (allowClose){
+      $("sync-modal-close").style.display = "inline-block";
+    } else {
+      setTimeout(()=> $("sync-modal").classList.remove("show"), 1200);
+    }
+  }
+  $("sync-modal-close").addEventListener("click", ()=> $("sync-modal").classList.remove("show"));
+
+  /* ============================ GOOGLE DRIVE OAUTH + REST API ============================ */
+  async function ensureTokenClient(){
+    const clientId = await getSetting("google-client-id");
+    if (!clientId){
+      const err = new Error("Add your Google OAuth Client ID under Setup first.");
+      err.needsSetup = true;
+      throw err;
+    }
+    if (typeof google === "undefined" || !google.accounts || !google.accounts.oauth2){
+      throw new Error("Google's sign-in script hasn't loaded yet — check your connection and try again in a moment.");
+    }
+    if (!gisTokenClient || gisTokenClient._clientId !== clientId){
+      gisTokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: DRIVE_SCOPE,
+        callback: () => {}
+      });
+      gisTokenClient._clientId = clientId;
+    }
+    return gisTokenClient;
+  }
+
+  function requestDriveToken(client){
+    return new Promise((resolve, reject)=>{
+      client.callback = (resp)=>{
+        if (resp && resp.error){ reject(new Error(resp.error)); return; }
+        driveAccessToken = resp.access_token;
+        driveTokenExpiry = Date.now() + ((resp.expires_in || 3500) * 1000);
+        resolve(driveAccessToken);
+      };
+      try{
+        client.requestAccessToken({ prompt: driveAccessToken ? "" : "consent" });
+      }catch(e){ reject(e); }
+    });
+  }
+
+  async function getDriveToken(){
+    if (driveAccessToken && Date.now() < driveTokenExpiry - 30000) return driveAccessToken;
+    const client = await ensureTokenClient();
+    return await requestDriveToken(client);
+  }
+
+  async function driveFetch(url, options){
+    options = options || {};
+    const token = await getDriveToken();
+    const headers = Object.assign({}, options.headers || {}, { Authorization: "Bearer " + token });
+    let res = await fetch(url, Object.assign({}, options, { headers }));
+    if (res.status === 401){
+      driveAccessToken = null; // force a fresh token once, then give up
+      const token2 = await getDriveToken();
+      const headers2 = Object.assign({}, options.headers || {}, { Authorization: "Bearer " + token2 });
+      res = await fetch(url, Object.assign({}, options, { headers: headers2 }));
+    }
+    if (!res.ok){
+      const text = await res.text().catch(()=> "");
+      throw new Error("Drive API error " + res.status + ": " + text.slice(0,200));
+    }
+    return res;
+  }
+
+  async function findDriveFile(name, mimeType, parentId){
+    let q = `name = '${name.replace(/'/g,"\\'")}' and trashed = false`;
+    if (mimeType) q += ` and mimeType = '${mimeType}'`;
+    if (parentId) q += ` and '${parentId}' in parents`;
+    const url = "https://www.googleapis.com/drive/v3/files?q=" + encodeURIComponent(q) +
+      "&fields=files(id,name,modifiedTime)&spaces=drive";
+    const res = await driveFetch(url);
+    const data = await res.json();
+    return (data.files && data.files[0]) || null;
+  }
+
+  async function ensureDriveFolder(){
+    let folderId = await getSetting("drive-folder-id");
+    if (folderId) return folderId;
+    const existing = await findDriveFile(DRIVE_FOLDER_NAME, "application/vnd.google-apps.folder", null);
+    if (existing){ await setSetting("drive-folder-id", existing.id); return existing.id; }
+    const res = await driveFetch("https://www.googleapis.com/drive/v3/files", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: DRIVE_FOLDER_NAME, mimeType: "application/vnd.google-apps.folder" })
+    });
+    const data = await res.json();
+    await setSetting("drive-folder-id", data.id);
+    return data.id;
+  }
+
+  async function ensureDriveDataFile(folderId){
+    let fileId = await getSetting("drive-file-id");
+    if (fileId) return fileId;
+    const existing = await findDriveFile(DRIVE_FILE_NAME, null, folderId);
+    if (existing){ await setSetting("drive-file-id", existing.id); return existing.id; }
+    return null; // doesn't exist yet — created on first save
+  }
+
+  async function saveToDrive(){
+    openSyncModal("Syncing to Drive…");
+    setSyncStatus("busy", "Syncing…");
+    try{
+      updateSyncModal("Connecting to your Google account…");
+      const folderId = await ensureDriveFolder();
+      let fileId = await ensureDriveDataFile(folderId);
+
+      const payload = JSON.stringify({
+        savedAt: new Date().toISOString(),
+        vehicles: state.vehicles,
+        drivers: state.drivers,
+        vehicleDrivers: state.vehicleDrivers,
+        trips: state.trips,
+        loans: state.loans
+      });
+
+      updateSyncModal("Uploading data…");
+      if (fileId){
+        await driveFetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: payload
+        });
+      } else {
+        const metadata = { name: DRIVE_FILE_NAME, parents: [folderId], mimeType: "application/json" };
+        const boundary = "tripledger" + Date.now();
+        const body =
+          `--${boundary}\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(metadata)}\r\n` +
+          `--${boundary}\r\nContent-Type: application/json\r\n\r\n${payload}\r\n` +
+          `--${boundary}--`;
+        const res = await driveFetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id", {
+          method: "POST",
+          headers: { "Content-Type": `multipart/related; boundary=${boundary}` },
+          body: body
+        });
+        const data = await res.json();
+        fileId = data.id;
+        await setSetting("drive-file-id", fileId);
+      }
+
+      await setSetting("drive-last-sync", new Date().toISOString());
+      setSyncStatus("ok", "Synced to Drive at " + new Date().toLocaleTimeString());
+      finishSyncModal(`Done — ${state.trips.length} trip(s) and ${state.loans.length} loan(s) saved to Drive.`, false);
+      toast("Synced to Google Drive.", "ok");
+    }catch(e){
+      console.error(e);
+      setSyncStatus("err", "Drive sync failed");
+      if (e.needsSetup){
+        finishSyncModal("Drive isn't set up yet — click ⚙ Setup and paste your Google OAuth Client ID.", true);
+        $("settings-modal").classList.add("show");
+      } else {
+        finishSyncModal("Sync failed: " + e.message + "\n\nYour data is safe locally — try again in a moment.", true);
+      }
+      toast("Drive sync failed — your local data is unaffected.", "err");
+    }
+  }
+
+  async function loadFromDrive(){
+    openSyncModal("Loading from Drive…");
+    setSyncStatus("busy", "Loading…");
+    try{
+      updateSyncModal("Connecting to your Google account…");
+      const folderId = await ensureDriveFolder();
+      const fileId = await ensureDriveDataFile(folderId);
+      if (!fileId) throw new Error("No saved data found in Drive yet — try Sync to Drive first.");
+
+      updateSyncModal("Downloading data…");
+      const res = await driveFetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
+      const text = await res.text();
+      const data = JSON.parse(text);
+
+      state.vehicles = data.vehicles || [];
+      state.drivers = data.drivers || [];
+      state.vehicleDrivers = data.vehicleDrivers || {};
+      state.trips = data.trips || [];
+      state.loans = data.loans || [];
+      render();
+
+      const savedAt = data.savedAt ? new Date(data.savedAt).toLocaleString() : "unknown time";
+      setSyncStatus("ok", "Loaded from Drive (saved " + savedAt + ")");
+      finishSyncModal(`Loaded ${state.trips.length} trip(s) and ${state.loans.length} loan(s) — snapshot saved ${savedAt}.`, false);
+      toast("Loaded data from Google Drive.", "ok");
+    }catch(e){
+      console.error(e);
+      setSyncStatus("err", "Drive load failed");
+      if (e.needsSetup){
+        finishSyncModal("Drive isn't set up yet — click ⚙ Setup and paste your Google OAuth Client ID.", true);
+        $("settings-modal").classList.add("show");
+      } else {
+        finishSyncModal("Could not load from Drive: " + e.message + "\n\nYour local data was not changed.", true);
+      }
+      toast("Drive load failed — your local data is unchanged.", "err");
+    }
+  }
+
+  $("btn-save-drive").addEventListener("click", saveToDrive);
+  $("btn-load-drive").addEventListener("click", ()=>{
+    askConfirm("Load from Drive?",
+      "This replaces what's currently shown here with the most recent snapshot saved in your Google Drive. Local data isn't touched until the load succeeds.",
+      loadFromDrive);
+  });
+
+  $("btn-settings").addEventListener("click", async ()=>{
+    $("settings-client-id").value = (await getSetting("google-client-id")) || "";
+    $("settings-modal").classList.add("show");
+  });
+  $("settings-cancel").addEventListener("click", ()=> $("settings-modal").classList.remove("show"));
+  $("settings-save").addEventListener("click", async ()=>{
+    const id = $("settings-client-id").value.trim();
+    await setSetting("google-client-id", id);
+    gisTokenClient = null;
+    driveAccessToken = null;
+    $("settings-modal").classList.remove("show");
+    toast(id ? "Google Client ID saved." : "Google Client ID cleared.", "ok");
+  });
+
+  /* ============================ INIT ============================ */
+  (async function init(){
+    await loadLocal();
+    render();
+    const lastSync = await getSetting("drive-last-sync");
+    const clientId = await getSetting("google-client-id");
+    if (lastSync){
+      setSyncStatus("ok", "Last synced " + new Date(lastSync).toLocaleString());
+    } else if (!clientId){
+      setSyncStatus("idle", "Click ⚙ Setup to connect Google Drive");
+    } else {
+      setSyncStatus("idle", "Not synced to Drive yet");
+    }
+    resetForm();
+  })();
+
+})();
+</script>
+</body>
+</html>
