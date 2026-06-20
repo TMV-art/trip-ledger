@@ -299,29 +299,34 @@
           <div class="field"><label>To Date</label><input type="date" id="f-date-to"></div>
           <div class="field"><label>Vehicle *</label><input list="vehicle-list" id="f-vehicle" placeholder="TN45AB1234" required></div>
           <datalist id="vehicle-list"></datalist>
-          <div class="field"><label>Freight Ton (t)</label><input type="number" id="f-tons" min="0" step="0.1" value="0"></div>
+          <div class="field"><label>Freight Ton (t)</label><input type="number" id="f-tons" min="0" step="0.01" value="0"></div>
 
           <div class="field span2"><label>Route</label><input type="text" id="f-route" placeholder="Trichy → Chennai"></div>
-          <div class="field"><label>Freight Total Rent (₹)</label><input type="number" id="f-total-rent" min="0" step="1" value="0"></div>
-          <div class="field"><label>Received So Far (₹)</label><input type="number" id="f-income" min="0" step="1" value="0"></div>
+          <div class="field"><label>Freight Total Rent (₹)</label><input type="number" id="f-total-rent" min="0" step="0.01" value="0"></div>
+          <div class="field"><label>Received So Far (₹)</label><input type="number" id="f-income" min="0" step="0.01" value="0"></div>
 
-          <div class="field"><label>Commission Amount (₹)</label><input type="number" id="f-commission" min="0" step="1" value="0"></div>
-          <div class="field"><label>Loading / Unloading (₹)</label><input type="number" id="f-loading" min="0" step="1" value="0"></div>
+          <div class="field"><label>Commission Amount (₹)</label><input type="number" id="f-commission" min="0" step="0.01" value="0"></div>
+          <div class="field"><label>Loading / Unloading (₹)</label><input type="number" id="f-loading" min="0" step="0.01" value="0"></div>
           <div class="field">
             <label>Balance Amount Pending (₹)</label>
             <input type="text" id="f-balance-pending" value="₹0" disabled>
             <span class="sublabel">Auto-calculated — not editable</span>
           </div>
-          <div class="field"><label>Diesel / Fuel (₹)</label><input type="number" id="f-fuel" min="0" step="1" value="0"></div>
-
-          <div class="field"><label>Toll (₹)</label><input type="number" id="f-toll" min="0" step="1" value="0"></div>
           <div class="field">
             <label>Driver Allowance (₹)</label>
             <input type="text" id="f-allowance" value="₹0" disabled>
             <span class="sublabel">Auto-calculated — 14% of Total Rent — not editable</span>
           </div>
-          <div class="field"><label>Repair / Maintenance (₹)</label><input type="number" id="f-repair" min="0" step="1" value="0"></div>
-          <div class="field"><label>Other Expenses (₹)</label><input type="number" id="f-other" min="0" step="1" value="0"></div>
+
+          <div class="field"><label>Diesel / Fuel (₹)</label><input type="number" id="f-fuel" min="0" step="0.01" value="0"></div>
+          <div class="field"><label>Toll (₹)</label><input type="number" id="f-toll" min="0" step="0.01" value="0"></div>
+          <div class="field"><label>Repair / Maintenance (₹)</label><input type="number" id="f-repair" min="0" step="0.01" value="0"></div>
+          <div class="field"><label>RTO Fee (₹)</label><input type="number" id="f-rto" min="0" step="0.01" value="0"></div>
+
+          <div class="field"><label>PC Fee (₹)</label><input type="number" id="f-pc" min="0" step="0.01" value="0"></div>
+          <div class="field"><label>TDS (₹)</label><input type="number" id="f-tds" min="0" step="0.01" value="0"></div>
+          <div class="field"><label>Load Crossing (₹)</label><input type="number" id="f-load-crossing" min="0" step="0.01" value="0"></div>
+          <div class="field"><label>Others (₹)</label><input type="number" id="f-other" min="0" step="0.01" value="0"></div>
         </div>
 
         <div class="field driver-field-block">
@@ -392,7 +397,7 @@
       <form id="loan-form">
         <div class="form-grid">
           <div class="field"><label>Vehicle *</label><select id="lf-vehicle" required></select></div>
-          <div class="field"><label>Total Loan Amount (₹) *</label><input type="number" id="lf-amount" min="1" step="1" required></div>
+          <div class="field"><label>Total Loan Amount (₹) *</label><input type="number" id="lf-amount" min="1" step="0.01" required></div>
           <div class="field"><label>No. of Months *</label><input type="number" id="lf-months" min="1" step="1" required></div>
           <div class="field"><label>Loan Start Date *</label><input type="date" id="lf-start" required></div>
         </div>
@@ -429,7 +434,7 @@
     <h3>Record a payment received</h3>
     <p class="modal-sub" id="payment-modal-sub"></p>
     <div class="form-grid" style="grid-template-columns:1fr 1fr;">
-      <div class="field"><label>Amount Received (₹)</label><input type="number" id="pm-amount" min="0" step="1"></div>
+      <div class="field"><label>Amount Received (₹)</label><input type="number" id="pm-amount" min="0" step="0.01"></div>
       <div class="field"><label>Date</label><input type="date" id="pm-date"></div>
     </div>
     <div id="payment-history"></div>
@@ -511,8 +516,11 @@
     return months[d.getMonth()] + "-" + d.getFullYear();
   };
   const tripAllowance = (t) => Math.round((t.totalRent||0) * 0.14);
-  const tripExpense = (t) => tripAllowance(t)+(t.fuel||0)+(t.toll||0)+(t.loading||0)+(t.repair||0)+(t.other||0);
-  const tripProfit = (t) => (t.income||0) - tripExpense(t);
+  const tripOtherTotal = (t) => (t.rto||0)+(t.pc||0)+(t.tds||0)+(t.loadCrossing||0)+(t.other||0);
+  // Expense = Driver Allowance + Commission + Fuel + Toll + Loading/Unloading + Repair + (RTO+PC+TDS+Load Crossing+Others)
+  const tripExpense = (t) => tripAllowance(t)+(t.commission||0)+(t.fuel||0)+(t.toll||0)+(t.loading||0)+(t.repair||0)+tripOtherTotal(t);
+  // Profit = Freight Total Rent - Expense (accrual basis: earned on the freight value, not on cash received)
+  const tripProfit = (t) => (t.totalRent||0) - tripExpense(t);
   // Balance Amount Pending = Freight Total Rent - (Received So Far + Commission + Loading/Unloading)
   const tripPending = (t) => (t.totalRent||0) - ((t.income||0) + (t.commission||0) + (t.loading||0));
 
@@ -635,13 +643,28 @@
     $("vehicle-list").innerHTML = state.vehicles.map(v=>`<option value="${v}">`).join("");
   }
 
+  function currentFormVehicle(){
+    return ($("f-vehicle").value || "").trim().toUpperCase().replace(/\s+/g,"");
+  }
+
   function renderDriverPicker(){
     const wrap = $("f-drivers-picker");
-    if (!state.drivers.length){
-      wrap.innerHTML = `<span class="hint">No drivers yet — add one below</span>`;
+    const veh = currentFormVehicle();
+    const vehicleKnown = veh && state.vehicles.includes(veh);
+
+    if (!vehicleKnown){
+      wrap.innerHTML = `<span class="hint">Select a vehicle above to see its mapped drivers</span>`;
       return;
     }
-    wrap.innerHTML = state.drivers.map(d=>{
+    const mapped = state.vehicleDrivers[veh] || [];
+    // Always include already-selected drivers too, so editing a trip never silently hides
+    // a driver whose vehicle mapping changed later.
+    const candidates = Array.from(new Set([...mapped, ...formSelectedDrivers]));
+    if (!candidates.length){
+      wrap.innerHTML = `<span class="hint">No drivers mapped to ${veh} yet — add one below, or map drivers to this vehicle from the Vehicle Master tab</span>`;
+      return;
+    }
+    wrap.innerHTML = candidates.map(d=>{
       const on = formSelectedDrivers.includes(d);
       return `<button type="button" class="chip ${on?"chip-on":""}" data-driver="${d}">${d}</button>`;
     }).join("");
@@ -654,6 +677,7 @@
       });
     });
   }
+  $("f-vehicle").addEventListener("input", renderDriverPicker);
 
   function renderDriverRoster(){
     const wrap = $("driver-roster");
@@ -791,7 +815,7 @@
       const expense = c.trips.reduce((s,t)=>s+tripExpense(t),0);
       const pending = c.trips.reduce((s,t)=>s+tripPending(t),0);
       const tons = c.trips.reduce((s,t)=>s+(t.tons||0),0);
-      const profit = income - expense;
+      const profit = totalRent - expense;
       const allClosed = c.trips.every(t=>t.status==="Closed");
       return `<tr data-veh="${c.vehicle}" data-month="${c.month}">
         <td class="mono">${c.vehicle}</td>
@@ -956,15 +980,16 @@
   }
 
   /* ============================ TRIP FORM ============================ */
-  const liveCalcIds = ["total-rent","income","commission","fuel","toll","loading","repair","other"];
+  const liveCalcIds = ["total-rent","income","commission","fuel","toll","loading","repair","rto","pc","tds","load-crossing","other"];
 
   function recalcLive(){
     const get = (id)=> parseFloat($("f-"+id).value) || 0;
     const totalRent = get("total-rent");
     const allowance = Math.round(totalRent * 0.14);
     $("f-allowance").value = inr(allowance);
-    const exp = allowance + get("fuel")+get("toll")+get("loading")+get("repair")+get("other");
-    const profit = get("income") - exp;
+    const otherTotal = get("rto")+get("pc")+get("tds")+get("load-crossing")+get("other");
+    const exp = allowance + get("commission") + get("fuel") + get("toll") + get("loading") + get("repair") + otherTotal;
+    const profit = totalRent - exp;
     const balance = totalRent - (get("income") + get("commission") + get("loading"));
     $("live-expense").textContent = inr(exp);
     $("live-profit").textContent = inrSigned(profit);
@@ -983,7 +1008,7 @@
     $("trip-form-title").textContent = "Add a trip";
     $("f-submit").textContent = "Add trip";
     $("f-cancel").style.display = "none";
-    ["total-rent","income","commission","fuel","toll","loading","repair","other","tons"].forEach(id=> $("f-"+id).value = 0);
+    ["total-rent","income","commission","fuel","toll","loading","repair","rto","pc","tds","load-crossing","other","tons"].forEach(id=> $("f-"+id).value = 0);
     formSelectedDrivers = [];
     renderDriverPicker();
     recalcLive();
@@ -1007,6 +1032,10 @@
       $("f-toll").value = t.toll||0;
       $("f-loading").value = t.loading||0;
       $("f-repair").value = t.repair||0;
+      $("f-rto").value = t.rto||0;
+      $("f-pc").value = t.pc||0;
+      $("f-tds").value = t.tds||0;
+      $("f-load-crossing").value = t.loadCrossing||0;
       $("f-other").value = t.other||0;
       formSelectedDrivers = (t.drivers||[]).slice();
       renderDriverPicker();
@@ -1060,6 +1089,10 @@
       toll: parseFloat($("f-toll").value)||0,
       loading: parseFloat($("f-loading").value)||0,
       repair: parseFloat($("f-repair").value)||0,
+      rto: parseFloat($("f-rto").value)||0,
+      pc: parseFloat($("f-pc").value)||0,
+      tds: parseFloat($("f-tds").value)||0,
+      loadCrossing: parseFloat($("f-load-crossing").value)||0,
       other: parseFloat($("f-other").value)||0,
     };
     if (editingTripId){
@@ -1081,9 +1114,15 @@
     const d = ensureDriver(input.value);
     if (!d){ toast("Enter a driver name first.", "err"); return; }
     if (!formSelectedDrivers.includes(d)) formSelectedDrivers.push(d);
+    const veh = currentFormVehicle();
+    if (veh && state.vehicles.includes(veh)){
+      const arr = state.vehicleDrivers[veh] || (state.vehicleDrivers[veh] = []);
+      if (!arr.includes(d)) arr.push(d);
+    }
     input.value = "";
     renderDriverPicker();
     renderDriverRoster();
+    renderVehicleGrid();
     persistLocal();
   });
   $("f-driver-new").addEventListener("keydown",(e)=>{
@@ -1183,20 +1222,21 @@
   /* ============================ CLOSE MONTH ============================ */
   function openCloseModal(vehicle, month){
     const trips = state.trips.filter(t=>t.vehicle===vehicle && monthLabel(t.dateFrom)===month && t.status==="Open");
-    const income = trips.reduce((s,t)=>s+(t.income||0),0);
+    const totalRent = trips.reduce((s,t)=>s+(t.totalRent||0),0);
     const expense = trips.reduce((s,t)=>s+tripExpense(t),0);
+    const profit = totalRent - expense;
     $("close-modal-sub").textContent = `${vehicle} · ${month} — every Open trip in this month will be marked Closed.`;
     $("close-modal-stats").innerHTML = `
       <div class="stat"><div class="lab">Trips</div><div class="val">${trips.length}</div></div>
-      <div class="stat"><div class="lab">Income</div><div class="val">${inr(income)}</div></div>
+      <div class="stat"><div class="lab">Total Rent</div><div class="val">${inr(totalRent)}</div></div>
       <div class="stat"><div class="lab">Expense</div><div class="val">${inr(expense)}</div></div>
-      <div class="stat"><div class="lab">Profit</div><div class="val ${income-expense>=0?"profit-pos":"profit-neg"}">${inr(income-expense)}</div></div>`;
+      <div class="stat"><div class="lab">Profit</div><div class="val ${profit>=0?"profit-pos":"profit-neg"}">${inrSigned(profit)}</div></div>`;
     $("close-modal").classList.add("show");
     $("close-modal-confirm").onclick = ()=>{
       trips.forEach(t=> t.status = "Closed");
       $("close-modal").classList.remove("show");
       render();
-      toast(`Closed ${vehicle} for ${month}: ${trips.length} trip(s), profit ${inr(income-expense)}.`, "ok");
+      toast(`Closed ${vehicle} for ${month}: ${trips.length} trip(s), profit ${inrSigned(profit)}.`, "ok");
     };
   }
   $("close-modal-cancel").addEventListener("click",()=> $("close-modal").classList.remove("show"));
