@@ -461,7 +461,7 @@
 <div class="modal-backdrop" id="settings-modal">
   <div class="modal">
     <h3>Google Drive setup</h3>
-    <p class="modal-sub">Paste the OAuth Client ID from your own Google Cloud project. It's stored only in this browser — never sent anywhere except Google's own sign-in popup.</p>
+    <p class="modal-sub">Paste the OAuth Client ID from your own Google Cloud project. It's stored only in this browser — never sent anywhere except Google's own sign-in popup. This app requests full Drive read/write access so it can find folders shared with you by others, not just files it created itself.</p>
     <div class="field">
       <label>Google OAuth Client ID</label>
       <input type="text" id="settings-client-id" placeholder="xxxxxxxxxx.apps.googleusercontent.com">
@@ -500,7 +500,7 @@
 
   const DRIVE_FOLDER_NAME = "Trip Ledger Data";
   const DRIVE_FILE_NAME = "trip-ledger-data.json";
-  const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+  const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
   let gisTokenClient = null;
   let driveAccessToken = null;
   let driveTokenExpiry = 0;
@@ -1386,7 +1386,37 @@
     return null; // doesn't exist yet — created on first save
   }
 
+  async function getFileModifiedTime(fileId){
+    const res = await driveFetch(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=modifiedTime`);
+    const data = await res.json();
+    return data.modifiedTime || null;
+  }
+
   async function saveToDrive(){
+    // Shared-file safety check: warn if someone else changed the Drive file since our last sync,
+    // since this is "last save wins" with no automatic merge.
+    try{
+      const clientId = await getSetting("google-client-id");
+      if (!clientId){ doSaveToDrive(); return; }
+      const folderId = await ensureDriveFolder();
+      const fileId = await ensureDriveDataFile(folderId);
+      if (fileId){
+        const knownModified = await getSetting("drive-known-modified");
+        const currentModified = await getFileModifiedTime(fileId);
+        if (knownModified && currentModified && new Date(currentModified) > new Date(knownModified)){
+          askConfirm("Someone else updated this data",
+            `The shared Drive file was changed after your last sync (now ${new Date(currentModified).toLocaleString()}). ` +
+            `Saving will overwrite those changes. Cancel and use Load from Drive first if you want to see them, ` +
+            `or continue to overwrite with what's on this screen.`,
+            ()=> doSaveToDrive());
+          return;
+        }
+      }
+    }catch(e){ /* fall through — let doSaveToDrive surface any real error */ }
+    doSaveToDrive();
+  }
+
+  async function doSaveToDrive(){
     openSyncModal("Syncing to Drive…");
     setSyncStatus("busy", "Syncing…");
     try{
@@ -1404,12 +1434,15 @@
       });
 
       updateSyncModal("Uploading data…");
+      let newModifiedTime = null;
       if (fileId){
-        await driveFetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+        const res = await driveFetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media&fields=modifiedTime`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: payload
         });
+        const data = await res.json();
+        newModifiedTime = data.modifiedTime || null;
       } else {
         const metadata = { name: DRIVE_FILE_NAME, parents: [folderId], mimeType: "application/json" };
         const boundary = "tripledger" + Date.now();
@@ -1417,16 +1450,18 @@
           `--${boundary}\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(metadata)}\r\n` +
           `--${boundary}\r\nContent-Type: application/json\r\n\r\n${payload}\r\n` +
           `--${boundary}--`;
-        const res = await driveFetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id", {
+        const res = await driveFetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,modifiedTime", {
           method: "POST",
           headers: { "Content-Type": `multipart/related; boundary=${boundary}` },
           body: body
         });
         const data = await res.json();
         fileId = data.id;
+        newModifiedTime = data.modifiedTime || null;
         await setSetting("drive-file-id", fileId);
       }
 
+      if (newModifiedTime) await setSetting("drive-known-modified", newModifiedTime);
       await setSetting("drive-last-sync", new Date().toISOString());
       setSyncStatus("ok", "Synced to Drive at " + new Date().toLocaleTimeString());
       finishSyncModal(`Done — ${state.trips.length} trip(s) and ${state.loans.length} loan(s) saved to Drive.`, false);
@@ -1464,6 +1499,9 @@
       state.trips = data.trips || [];
       state.loans = data.loans || [];
       render();
+
+      const currentModified = await getFileModifiedTime(fileId).catch(()=> null);
+      if (currentModified) await setSetting("drive-known-modified", currentModified);
 
       const savedAt = data.savedAt ? new Date(data.savedAt).toLocaleString() : "unknown time";
       setSyncStatus("ok", "Loaded from Drive (saved " + savedAt + ")");
